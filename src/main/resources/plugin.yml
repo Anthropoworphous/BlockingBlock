@@ -1,0 +1,9 @@
+name: BlockingBlock
+version: '${project.version}'
+main: com.github.anthropoworphous.blockingblock.BlockingBlock
+api-version: 1.17
+prefix: BB
+load: STARTUP
+authors: [ Anthropoworphous ]
+description: A block that blocks some command usage in a radius
+website: https://github.com/anthropoworphous
