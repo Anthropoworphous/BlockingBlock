@@ -6,10 +6,12 @@ import com.github.anthropoworphous.blockingblock.event.BlockBroken;
 import com.github.anthropoworphous.blockingblock.event.BlockPlaced;
 import com.github.anthropoworphous.blockingblock.event.CMDListener;
 import com.github.anthropoworphous.cmdlib.processor.CMDRegister;
+import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
@@ -23,7 +25,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.*;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.bukkit.Bukkit.getPluginManager;
 
@@ -56,8 +61,6 @@ public final class BlockingBlock extends JavaPlugin {
         getPluginManager().registerEvents(new BlockPlaced(), this);
 
         CMDRegister.registerCMD(new TestCMD(), this);
-
-        getBlockLocations().initLoop(this);
     }
 
     @Override
@@ -71,19 +74,61 @@ public final class BlockingBlock extends JavaPlugin {
         p.toFile().mkdirs();
         return p.resolve("locations.json").toFile();
     }
+
     private static BlockLocations getLocations() {
         File f = getLocationFile();
+        Gson g = new GsonBuilder().registerTypeAdapter(
+                BlockLocations.class,
+                (JsonDeserializer<BlockLocations>) (json, typeOfT, context) -> {
+                    Map<Location, Long> map = new HashMap<>();
+                    json.getAsJsonArray().forEach(obj -> {
+                        JsonObject o2 = obj.getAsJsonObject();
+                        JsonObject o1 = o2.get("location").getAsJsonObject();
+                        map.put(
+                                new Location(
+                                    Bukkit.getWorld(o1.get("world").getAsString()),
+                                    o1.get("x").getAsDouble(),
+                                    o1.get("y").getAsDouble(),
+                                    o1.get("z").getAsDouble()
+                                ),
+                                o2.get("time").getAsLong()
+                        );
+                    });
+                    Bukkit.getLogger().info("recovered %d blocks".formatted(map.size()));
+                    return map.size() == 0 ? new BlockLocations() : new BlockLocations(map);
+                }
+        ).create();
+
         try (Reader fr = new FileReader(f)) {
-            return f.createNewFile() ? new BlockLocations() : new Gson().fromJson(fr, BlockLocations.class);
+            return f.createNewFile() ? new BlockLocations() : g.fromJson(fr, BlockLocations.class);
         } catch (Exception ignored) {
             return new BlockLocations();
         }
     }
+
     private static void saveLocations(BlockLocations locations) {
         File f = getLocationFile();
+        Gson g = new GsonBuilder().setPrettyPrinting().registerTypeAdapter(
+                BlockLocations.class,
+                (JsonSerializer<BlockLocations>) (obj, typeOfT, context) -> {
+                    JsonArray a = new JsonArray();
+                    obj.getBlockLocations().forEach((l, t) -> {
+                        JsonObject o1 = new JsonObject(), o2 = new JsonObject();
+                        o1.add("world", new JsonPrimitive(l.getWorld().getName()));
+                        o1.add("x", new JsonPrimitive(l.getX()));
+                        o1.add("y", new JsonPrimitive(l.getY()));
+                        o1.add("z", new JsonPrimitive(l.getZ()));
+                        o2.add("time", new JsonPrimitive(t));
+                        o2.add("location", o1);
+                        a.add(o2);
+                    });
+                    return a;
+                }
+        ).create();
+
         try (Writer fw = new FileWriter(f)) {
-            Bukkit.getLogger().info(new GsonBuilder().setPrettyPrinting().create().toJson(locations));
-            fw.write(new GsonBuilder().setPrettyPrinting().create().toJson(locations));
+            Bukkit.getLogger().info(g.toJson(locations));
+            fw.write(g.toJson(locations));
             fw.flush();
         } catch (Exception e) {
             e.printStackTrace();
@@ -124,4 +169,6 @@ public final class BlockingBlock extends JavaPlugin {
                 .setIngredient('3', Material.NETHER_STAR);
         getServer().addRecipe(r);
     }
+
+
 }

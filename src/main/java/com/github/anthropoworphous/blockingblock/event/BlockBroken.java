@@ -1,7 +1,7 @@
 package com.github.anthropoworphous.blockingblock.event;
 
 import com.github.anthropoworphous.blockingblock.BlockingBlock;
-import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
@@ -13,11 +13,12 @@ public class BlockBroken implements Listener {
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event) {
         Location loc = event.getBlock().getLocation().toCenterLocation();
-        if (BlockingBlock.getBlockLocations().removeBlock(loc)) { // side effect: remove block from list
-            Bukkit.getLogger().info("block broken");
-            event.setCancelled(true);
-            loc.getWorld().dropItemNaturally(loc, BlockingBlock.getBlockItem());
-            loc.getBlock().setType(Material.AIR);
+        if (BlockingBlock.getBlockLocations().removeBlock(loc)) {
+            if (event.getPlayer().getGameMode() == GameMode.SURVIVAL) {
+                event.setCancelled(true);
+                loc.getWorld().dropItemNaturally(loc, BlockingBlock.getBlockItem());
+                loc.getBlock().setType(Material.AIR);
+            }
         }
     }
 }
